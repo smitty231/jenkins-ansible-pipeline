@@ -1,6 +1,11 @@
 - name: Install and start Nginx
   hosts: web_servers
   become: yes
+  vars:
+    already_installed: 0
+    newly_installed: 0
+    already_running: 0
+    newly_started: 0
   tasks:
     - name: Check if Nginx package is installed
       yum:
@@ -8,28 +13,42 @@
         state: present
       register: nginx_install_result
 
-    - name: Display message if Nginx is already installed on this host
-      debug:
-        msg: "Nginx is already installed on {{ inventory_hostname }}."
+    - name: Increment already_installed if Nginx is already installed
+      set_fact:
+        already_installed: "{{ already_installed + 1 }}"
       when: not nginx_install_result.changed
 
-    - name: Install Nginx package if not already installed
-      yum:
-        name: nginx
-        state: present
+    - name: Increment newly_installed if Nginx is newly installed
+      set_fact:
+        newly_installed: "{{ newly_installed + 1 }}"
       when: nginx_install_result.changed
 
     - name: Check if Nginx service is running
       service_facts:
 
-    - name: Display message if Nginx service is already running on this host
-      debug:
-        msg: "Nginx service is already running on {{ inventory_hostname }}."
+    - name: Increment already_running if Nginx service is already running
+      set_fact:
+        already_running: "{{ already_running + 1 }}"
       when: "'nginx' in ansible_facts.services and ansible_facts.services['nginx'].state == 'running'"
 
-    - name: Ensure Nginx service is running and enabled
+    - name: Start and enable Nginx service if not running
       service:
         name: nginx
         state: started
         enabled: yes
       when: "'nginx' not in ansible_facts.services or ansible_facts.services['nginx'].state != 'running'"
+      register: nginx_start_result
+
+    - name: Increment newly_started if Nginx service was newly started
+      set_fact:
+        newly_started: "{{ newly_started + 1 }}"
+      when: nginx_start_result.changed
+
+    - name: Display summary of Nginx installation and running status
+      debug:
+        msg: |
+          Summary:
+          - Hosts with Nginx already installed: {{ already_installed }}
+          - Hosts where Nginx was newly installed: {{ newly_installed }}
+          - Hosts with Nginx already running: {{ already_running }}
+          - Hosts where Nginx was newly started: {{ newly_started }}
