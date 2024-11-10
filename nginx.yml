@@ -44,24 +44,20 @@
         newly_started: "{{ newly_started + 1 }}"
       when: nginx_start_result.changed
 
-    - name: Aggregate results on delegate host
-      ansible.builtin.local_action:
-        module: set_fact
-        data:
-          global_already_installed: "{{ global_already_installed | default(0) + already_installed }}"
-          global_newly_installed: "{{ global_newly_installed | default(0) + newly_installed }}"
-          global_already_running: "{{ global_already_running | default(0) + already_running }}"
-          global_newly_started: "{{ global_newly_started | default(0) + newly_started }}"
-      run_once: true
-      delegate_to: localhost
+  # Run this block only once to aggregate and display the summary.
+  - name: Aggregate and display summary of Nginx installation and running status
+    hosts: localhost
+    gather_facts: no
+    tasks:
+      - name: Aggregate results from all hosts
+        set_fact:
+          global_summary: |
+            Summary:
+            - Hosts with Nginx already installed: {{ groups['web_servers'] | map('extract', hostvars, 'already_installed') | sum }}
+            - Hosts where Nginx was newly installed: {{ groups['web_servers'] | map('extract', hostvars, 'newly_installed') | sum }}
+            - Hosts with Nginx already running: {{ groups['web_servers'] | map('extract', hostvars, 'already_running') | sum }}
+            - Hosts where Nginx was newly started: {{ groups['web_servers'] | map('extract', hostvars, 'newly_started') | sum }}
 
-    - name: Display summary of Nginx installation and running status
-      debug:
-        msg: |
-          Summary:
-          - Hosts with Nginx already installed: {{ global_already_installed }}
-          - Hosts where Nginx was newly installed: {{ global_newly_installed }}
-          - Hosts with Nginx already running: {{ global_already_running }}
-          - Hosts where Nginx was newly started: {{ global_newly_started }}
-      run_once: true
-      delegate_to: localhost
+      - name: Display summary
+        debug:
+          msg: "{{ global_summary }}"
