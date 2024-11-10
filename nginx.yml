@@ -1,84 +1,35 @@
-- name: Install and configure Nginx
+- name: Install and start Nginx
   hosts: web_servers
   become: yes
-  vars:
-    nginx_package: nginx
-    nginx_service: nginx
-    firewall_enabled: true
   tasks:
-    - name: Check if Nginx is installed
+    - name: Check if Nginx package is installed
       yum:
-        name: "{{ nginx_package }}"
+        name: nginx
         state: present
       register: nginx_install_result
-      when: ansible_os_family == "RedHat"
 
-    - name: Check if Nginx is installed (Debian-based)
-      apt:
-        name: "{{ nginx_package }}"
+    - name: Display message if Nginx is already installed on this host
+      debug:
+        msg: "Nginx is already installed on {{ inventory_hostname }}."
+      when: not nginx_install_result.changed
+
+    - name: Install Nginx package if not already installed
+      yum:
+        name: nginx
         state: present
-        update_cache: yes
-      register: nginx_install_result
-      when: ansible_os_family == "Debian"
-
-    - name: Increment installed count if Nginx is installed
-      set_fact:
-        installed_count: "{{ (installed_count | default(0)) + 1 }}"
-      when: nginx_install_result is succeeded
+      when: nginx_install_result.changed
 
     - name: Check if Nginx service is running
       service_facts:
-    
-    - name: Display status if Nginx is running
+
+    - name: Display message if Nginx service is already running on this host
       debug:
-        msg: "Nginx is already running."
-      when: "'{{ nginx_service }}' in ansible_facts.services and ansible_facts.services['{{ nginx_service }}'].state == 'running'"
+        msg: "Nginx service is already running on {{ inventory_hostname }}."
+      when: "'nginx' in ansible_facts.services and ansible_facts.services['nginx'].state == 'running'"
 
-    - name: Increment running count if Nginx is running
-      set_fact:
-        running_count: "{{ (running_count | default(0)) + 1 }}"
-      when: "'{{ nginx_service }}' in ansible_facts.services and ansible_facts.services['{{ nginx_service }}'].state == 'running'"
-
-    - name: Start and enable Nginx service if not already running
+    - name: Ensure Nginx service is running and enabled
       service:
-        name: "{{ nginx_service }}"
+        name: nginx
         state: started
         enabled: yes
-      when: "'{{ nginx_service }}' not in ansible_facts.services or ansible_facts.services['{{ nginx_service }}'].state != 'running'"
-      notify: restart nginx
-
-    - name: Increment not installed count if Nginx was not previously installed
-      set_fact:
-        not_installed_count: "{{ (not_installed_count | default(0)) + 1 }}"
-      when: nginx_install_result is changed
-
-    - name: Configure firewall to allow HTTP and HTTPS (if firewall enabled)
-      firewalld:
-        service: "{{ item }}"
-        permanent: yes
-        state: enabled
-        immediate: yes
-      loop:
-        - http
-        - https
-      when: firewall_enabled
-      notify: reload firewall
-
-    - name: Display summary of Nginx installation and running status
-      debug:
-        msg: |
-          Summary:
-          - Total installed: {{ installed_count | default(0) }}
-          - Total running: {{ running_count | default(0) }}
-          - Total not installed initially: {{ not_installed_count | default(0) }}
-
-  handlers:
-    - name: restart nginx
-      service:
-        name: "{{ nginx_service }}"
-        state: restarted
-
-    - name: reload firewall
-      service:
-        name: firewalld
-        state: reloaded
+      when: "'nginx' not in ansible_facts.services or ansible_facts.services['nginx'].state != 'running'"
