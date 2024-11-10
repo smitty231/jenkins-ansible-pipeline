@@ -1,13 +1,84 @@
-- name: Install and start Nginx
+- name: Install and configure Nginx
   hosts: web_servers
   become: yes
+  vars:
+    nginx_package: nginx
+    nginx_service: nginx
+    firewall_enabled: true
   tasks:
-    - name: Install Nginx package
+    - name: Check if Nginx is installed
       yum:
-        name: nginx
+        name: "{{ nginx_package }}"
         state: present
-    - name: Ensure Nginx service is running
+      register: nginx_install_result
+      when: ansible_os_family == "RedHat"
+
+    - name: Check if Nginx is installed (Debian-based)
+      apt:
+        name: "{{ nginx_package }}"
+        state: present
+        update_cache: yes
+      register: nginx_install_result
+      when: ansible_os_family == "Debian"
+
+    - name: Increment installed count if Nginx is installed
+      set_fact:
+        installed_count: "{{ (installed_count | default(0)) + 1 }}"
+      when: nginx_install_result is succeeded
+
+    - name: Check if Nginx service is running
+      service_facts:
+    
+    - name: Display status if Nginx is running
+      debug:
+        msg: "Nginx is already running."
+      when: "'{{ nginx_service }}' in ansible_facts.services and ansible_facts.services['{{ nginx_service }}'].state == 'running'"
+
+    - name: Increment running count if Nginx is running
+      set_fact:
+        running_count: "{{ (running_count | default(0)) + 1 }}"
+      when: "'{{ nginx_service }}' in ansible_facts.services and ansible_facts.services['{{ nginx_service }}'].state == 'running'"
+
+    - name: Start and enable Nginx service if not already running
       service:
-        name: nginx
+        name: "{{ nginx_service }}"
         state: started
         enabled: yes
+      when: "'{{ nginx_service }}' not in ansible_facts.services or ansible_facts.services['{{ nginx_service }}'].state != 'running'"
+      notify: restart nginx
+
+    - name: Increment not installed count if Nginx was not previously installed
+      set_fact:
+        not_installed_count: "{{ (not_installed_count | default(0)) + 1 }}"
+      when: nginx_install_result is changed
+
+    - name: Configure firewall to allow HTTP and HTTPS (if firewall enabled)
+      firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - http
+        - https
+      when: firewall_enabled
+      notify: reload firewall
+
+    - name: Display summary of Nginx installation and running status
+      debug:
+        msg: |
+          Summary:
+          - Total installed: {{ installed_count | default(0) }}
+          - Total running: {{ running_count | default(0) }}
+          - Total not installed initially: {{ not_installed_count | default(0) }}
+
+  handlers:
+    - name: restart nginx
+      service:
+        name: "{{ nginx_service }}"
+        state: restarted
+
+    - name: reload firewall
+      service:
+        name: firewalld
+        state: reloaded
