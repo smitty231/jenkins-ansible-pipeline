@@ -3,40 +3,23 @@
   become: yes
   tasks:
     - name: Check if Nginx package is already installed
-      yum:
-        name: nginx
-        state: present
-        check_mode: yes
+      command: rpm -q nginx
       register: nginx_check
+      ignore_errors: yes
 
     - name: Skip Nginx installation if already installed
       debug:
         msg: "Nginx is already installed, skipping installation."
-      when: nginx_check.changed == false
+      when: nginx_check.rc == 0
 
     - name: Install Nginx package if not already installed
       yum:
         name: nginx
         state: present
-      when: nginx_check.changed == true
+      when: nginx_check.rc != 0
 
     - name: Ensure Nginx service is running
       service:
         name: nginx
         state: started
         enabled: yes
-
-    - name: Check if Nginx service is running
-      service_facts:
-    
-    - name: Skip Nginx start if already running
-      debug:
-        msg: "Nginx service is already running, skipping start."
-      when: "'nginx' in ansible_facts.services and ansible_facts.services['nginx'].state == 'running'"
-
-    - name: Start Nginx service if not running
-      service:
-        name: nginx
-        state: started
-        enabled: yes
-      when: "'nginx' not in ansible_facts.services or ansible_facts.services['nginx'].state != 'running'"
