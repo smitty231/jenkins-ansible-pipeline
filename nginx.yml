@@ -44,11 +44,24 @@
         newly_started: "{{ newly_started + 1 }}"
       when: nginx_start_result.changed
 
+    - name: Aggregate results on delegate host
+      ansible.builtin.local_action:
+        module: set_fact
+        data:
+          global_already_installed: "{{ global_already_installed | default(0) + already_installed }}"
+          global_newly_installed: "{{ global_newly_installed | default(0) + newly_installed }}"
+          global_already_running: "{{ global_already_running | default(0) + already_running }}"
+          global_newly_started: "{{ global_newly_started | default(0) + newly_started }}"
+      run_once: true
+      delegate_to: localhost
+
     - name: Display summary of Nginx installation and running status
       debug:
         msg: |
           Summary:
-          - Hosts with Nginx already installed: {{ already_installed }}
-          - Hosts where Nginx was newly installed: {{ newly_installed }}
-          - Hosts with Nginx already running: {{ already_running }}
-          - Hosts where Nginx was newly started: {{ newly_started }}
+          - Hosts with Nginx already installed: {{ global_already_installed }}
+          - Hosts where Nginx was newly installed: {{ global_newly_installed }}
+          - Hosts with Nginx already running: {{ global_already_running }}
+          - Hosts where Nginx was newly started: {{ global_newly_started }}
+      run_once: true
+      delegate_to: localhost
