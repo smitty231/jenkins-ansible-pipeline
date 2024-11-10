@@ -40,19 +40,19 @@
         newly_started: "{{ newly_started + 1 }}"
       when: nginx_start_result.changed
 
-  - name: Aggregate and display summary of Nginx installation and running status
-    hosts: localhost
-    gather_facts: no
-    tasks:
-      - name: Aggregate results from all hosts
-        set_fact:
-          global_summary: |
-            Summary:
-            - Hosts with Nginx already installed: {{ groups['web_servers'] | map('extract', hostvars, 'already_installed') | sum }}
-            - Hosts where Nginx was newly installed: {{ groups['web_servers'] | map('extract', hostvars, 'newly_installed') | sum }}
-            - Hosts with Nginx already running: {{ groups['web_servers'] | map('extract', hostvars, 'already_running') | sum }}
-            - Hosts where Nginx was newly started: {{ groups['web_servers'] | map('extract', hostvars, 'newly_started') | sum }}
+- name: Aggregate and display summary of Nginx installation and running status
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Aggregate results from all hosts
+      set_fact:
+        global_summary: |
+          Summary:
+          - Hosts with Nginx already installed: {{ groups['web_servers'] | map('extract', hostvars, 'already_installed') | sum }}
+          - Hosts where Nginx was newly installed: {{ groups['web_servers'] | map('extract', hostvars, 'newly_installed') | sum }}
+          - Hosts with Nginx already running: {{ groups['web_servers'] | map('extract', hostvars, 'already_running') | sum }}
+          - Hosts where Nginx was newly started: {{ groups['web_servers'] | map('extract', hostvars, 'newly_started') | sum }}
 
-      - name: Display summary
-        debug:
-          msg: "{{ global_summary }}"
+    - name: Display summary
+      debug:
+        msg: "{{ global_summary }}"
